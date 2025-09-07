@@ -1,50 +1,86 @@
-    // src/app/api/process-image/route.ts
-    import { NextResponse } from 'next/server';
-    import { doc, getDoc, updateDoc } from 'firebase/firestore';
-    import { auth, db } from '@/firebase';
+// src/app/api/process-image/route.ts
+import { NextResponse } from 'next/server';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { auth, db } from '@/firebase';
 
-    export async function POST(request: Request) {
-      try {
-        // Step 1: Parse the request body (image file)
-        const formData = await request.formData();
-        const imageFile = formData.get('image');
+// The Admin SDK is needed for secure backend authentication
+import * as admin from 'firebase-admin';
 
-        if (!imageFile) {
-          return NextResponse.json({ error: 'No image file uploaded.' }, { status: 400 });
-        }
+// Helper function to convert a Blob to a Base64 string
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
 
-        // Step 2: Authenticate the user (simulated)
-        // In a real app, we would verify the user's session token here.
-        // For this demo, we'll assume the user is authenticated from the client-side.
-        const user = auth.currentUser;
-        if (!user) {
-          return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
-        }
+// Initialize Firebase Admin SDK if not already done
+if (!admin.apps.length) {
+  // It's assumed your service account key is in the root and ignored by Git
+  const serviceAccount = require('@/../serviceAccountKey.json');
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+  });
+}
 
-        // Step 3: Check and deduct credits from Firestore
-        const userDocRef = doc(db, 'users', user.uid);
-        const userDoc = await getDoc(userDocRef);
-
-        if (!userDoc.exists() || userDoc.data()?.credits < 1) {
-          return NextResponse.json({ error: 'Insufficient credits.' }, { status: 402 });
-        }
-
-        // Deduct one credit
-        await updateDoc(userDocRef, {
-          credits: userDoc.data().credits - 1,
-        });
-
-        // Step 4: Simulate AI image processing
-        console.log(`Processing image for user ${user.uid}...`);
-        await new Promise(resolve => setTimeout(resolve, 3000)); // Simulate AI delay
-
-        // Step 5: Return a placeholder processed image URL
-        const processedImageUrl = `https://placehold.co/600x400/94A3B8/FFFFFF?text=Processed+Image`;
-
-        return NextResponse.json({ processedImageUrl });
-      } catch (error) {
-        console.error('API Error:', error);
-        return NextResponse.json({ error: 'An unexpected error occurred.' }, { status: 500 });
-      }
+export async function POST(request: Request) {
+  try {
+    // Read the authorization header
+    const authHeader = request.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Authorization header not found.' }, { status: 401 });
     }
-    
+    const idToken = authHeader.split('Bearer ')[1];
+
+    // Verify the user's token using the Admin SDK
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    const uid = decodedToken.uid;
+
+    const formData = await request.formData();
+    const imageFile = formData.get('image');
+
+    if (!imageFile) {
+      return NextResponse.json({ error: 'No image file uploaded.' }, { status: 400 });
+    }
+
+    const userDocRef = doc(db, 'users', uid);
+    const userDoc = await getDoc(userDocRef);
+
+    if (!userDoc.exists() || userDoc.data()?.credits < 1) {
+      return NextResponse.json({ error: 'Insufficient credits.' }, { status: 402 });
+    }
+
+    await updateDoc(userDocRef, {
+      credits: userDoc.data().credits - 1,
+    });
+
+    // Step 3: Call the real AI image processing API
+    const API_KEY = process.env.REAL_ESRGAN_API_KEY;
+    const apiResponse = await fetch('https://api.replicate.com/v1/predictions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Token ${API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        version: 'f121d640bd286e1fdc67f9799164c1d5be36ff74576ee11c803ae5b665dd46aa', // The Real-ESRGAN model version
+        input: { image: await blobToBase64(imageFile as Blob), scale: 4 }, // Upscale by 4x
+      }),
+    });
+
+    if (!apiResponse.ok) {
+      const errorData = await apiResponse.json();
+      throw new Error(errorData.detail || 'API failed to process the image.');
+    }
+
+    const data = await apiResponse.json();
+    const processedImageUrl = data.output;
+
+    return NextResponse.json({ processedImageUrl });
+  } catch (error: any) {
+    console.error('API Error:', error);
+    return NextResponse.json({ error: 'An unexpected error occurred.' }, { status: 500 });
+  }
+}
