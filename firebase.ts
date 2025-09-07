@@ -1,9 +1,8 @@
 // src/firebase.ts
-import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
+import { initializeApp, getApps } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
-// Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyCxaXpmrfciZh4HEhcCSjkSzo_XnaPUNoU",
   authDomain: "ai-image-editor-app.firebaseapp.com",
@@ -13,9 +12,8 @@ const firebaseConfig = {
   appId: "1:247871205953:web:db81a446add29190f5ccc0"
 };
 
-let firebaseApp: FirebaseApp;
+let firebaseApp;
 
-// Check if a Firebase app has already been initialized
 if (!getApps().length) {
   firebaseApp = initializeApp(firebaseConfig);
 } else {
@@ -25,4 +23,4 @@ if (!getApps().length) {
 const auth = getAuth(firebaseApp);
 const db = getFirestore(firebaseApp);
 
-export { auth, db, firebaseApp };
+export { auth, db };
