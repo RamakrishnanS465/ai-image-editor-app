@@ -5,6 +5,7 @@ import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth, db } from '@/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import MonetizationModal from '@/components/MonetizationModal';
+import ImageEditor from '@/components/ImageEditor';
 
 export default function Dashboard() {
   const [user, setUser] = useState<any | null>(null);
@@ -16,17 +17,15 @@ export default function Dashboard() {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
         setUser(currentUser);
-        // Check for user document in Firestore
         const userDocRef = doc(db, 'users', currentUser.uid);
         const userDoc = await getDoc(userDocRef);
 
         if (userDoc.exists()) {
           setCredits(userDoc.data().credits);
         } else {
-          // Create new user document with initial credits
           await setDoc(userDocRef, {
             email: currentUser.email,
-            credits: 2, // Free tier credits
+            credits: 2,
             createdAt: new Date(),
           });
           setCredits(2);
@@ -64,6 +63,7 @@ export default function Dashboard() {
         Your current credit balance is:
         <span className="font-bold text-indigo-600 ml-2">{credits}</span>
       </p>
+      <ImageEditor />
       <button
         onClick={() => setIsMonetizationModalOpen(true)}
         className="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-8 rounded-lg shadow-lg transition duration-300 transform hover:scale-105"

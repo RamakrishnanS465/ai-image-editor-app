@@ -2,7 +2,7 @@
 'use client';
 import React, { useState } from 'react';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '@/firebase';
+import { auth } from '../firebase';
 
 type AuthModalProps = {
   isOpen: boolean;

@@ -1,21 +1,20 @@
 // src/app/page.tsx
 'use client';
+// src/app/page.tsx
+'use client';
 
 import Layout from '@/components/Layout';
 import AuthModal from '@/components/AuthModal';
-import Dashboard from '@/components/Dashboard'; // Import Dashboard
+import Dashboard from '@/components/Dashboard';
 import { useState, useEffect } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/firebase';
-import { getFirestore } from 'firebase/firestore';
-import { firebaseApp } from '@/firebase';
 
 export default function Home() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const db = getFirestore(firebaseApp);
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setIsAuthenticated(!!user);
